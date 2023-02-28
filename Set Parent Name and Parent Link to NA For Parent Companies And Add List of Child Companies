@@ -1,0 +1,57 @@
+const hubspot = require('@hubspot/api-client');
+
+exports.main = async (event, callback) => {
+
+  //Created by Nathan De Long @ HubSpot, 2/28/2023
+  //HubSpot Client v3
+  //This code is provided as-is, please test this code prior to using it in a live workflow in your environment.
+
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.hstoken
+  });
+  
+  try{
+  //get the associated companies for the parent company. note, trigger for this workflow is companies where number of child companies is greater than 0
+  
+  const hs_object_id = event.inputFields['hs_object_id'];
+  //first, reach out to the associations API to get the contacts associated with the parent company. 
+  const apiResponse = await hubspotClient
+              .apiRequest({
+              method: 'GET',
+              path: `/crm/v4/objects/company/${hs_object_id}/associations/company`,
+              body: {}
+            });
+  //show the companies associated with the parent company in the console
+  console.log(JSON.stringify(apiResponse.body, null, 2));
+  //put the IDs for the associated companies into an array
+  var associatedCompanyIDs = apiResponse.body.results.map(resultItem => `{"id": "${resultItem.toObjectId}"}`);
+  //log the child company IDs to the console for debugging
+  console.log(associatedCompanyIDs);
+  //remove unwanted single apostrophes from the list of associated company IDs 
+  var cleanedAssociatedCompanyIDs = associatedCompanyIDs.join(',').replace(/'([^']+(?='))'/g, '$1');
+  //log the cleaned child company IDs to the console for debugging
+  console.log(cleanedAssociatedCompanyIDs);
+  // add brackets to enclose the cleaned up associated company IDs
+  var cleanedAssociatedCompanyIDsWithBrackets = `[` + cleanedAssociatedCompanyIDs + `]`;
+  
+  //submit the cleaned child company IDs to the batch companies API
+  const BatchReadInputSimplePublicObjectId = { properties: ["name"], propertiesWithHistory: ["name"], inputs: JSON.parse(`${cleanedAssociatedCompanyIDsWithBrackets}`) };
+  console.log(BatchReadInputSimplePublicObjectId);
+  const archived = false;
+  const apiResponse2 = await hubspotClient.crm.companies.batchApi.read(BatchReadInputSimplePublicObjectId, archived);
+  console.log(JSON.stringify(apiResponse2.body, null, 2));
+  //list out the child companies and store them in a variable
+  var childCompanyNames = apiResponse2.body.results.map(resultItem => resultItem.properties.name);
+  console.log(childCompanyNames);
+  //remove unwanted single apostrophes from the list of child company names
+  var cleanedChildCompanyNames = childCompanyNames.join(', ').replace(/'([^']+(?='))'/g, '$1');
+  //list out the cleaned up child company names in the console
+  console.log(cleanedChildCompanyNames);
+    
+} catch (e) {
+  e.message === 'HTTP request failed'
+    ? console.error(JSON.stringify(e.response, null, 2))
+    : console.error(e)
+}
+  callback({ outputFields: {cleanedChildCompanyNames} }); 
+}
