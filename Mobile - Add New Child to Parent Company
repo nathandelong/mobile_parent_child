@@ -1,0 +1,30 @@
+const hubspot = require('@hubspot/api-client');
+
+exports.main = async (event, callback) => {
+
+  //Created by Nathan De Long @ HubSpot, 2/28/2023
+  //HubSpot Client v3
+  //This code is provided as-is, please test this code prior to using it in a live workflow in your environment.
+
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.hstoken
+  });
+  
+  //add the child ID entered in the field "3 For Parent Companies Only - New Child ID to Add" as a child of the parent company  
+  
+const hs_object_id = event.inputFields['hs_object_id'];
+const child_id = event.inputFields['child_id'];
+
+const BatchInputPublicAssociation = { inputs: [{"from":{"id": hs_object_id},"to":{"id": child_id},"type":"parent_to_child_company"}] };
+const fromObjectType = "company";
+const toObjectType = "company";
+
+try {
+  const apiResponse = await hubspotClient.crm.associations.batchApi.create(fromObjectType, toObjectType, BatchInputPublicAssociation);
+  console.log(JSON.stringify(apiResponse.body, null, 2));
+} catch (e) {
+  e.message === 'HTTP request failed'
+    ? console.error(JSON.stringify(e.response, null, 2))
+    : console.error(e)
+}
+}
